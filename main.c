@@ -16,6 +16,7 @@
 #include <sys/conf.h>   /* cdevsw struct */
 #include <sys/uio.h>    /* uio struct */
 #include <sys/malloc.h>
+#include <sys/vmmeter.h>
 
 #define BUFFERSIZE 255
 
@@ -26,7 +27,7 @@ static d_read_t      echo_read;
 static d_write_t     echo_write;
 
 /* Character device entry points */
-static struct cdevsw echo_cdevsw = {
+static struct cdevsw severe_cdevsw = {
   .d_version = D_VERSION,
   .d_open = echo_open,
   .d_close = echo_close,
@@ -37,8 +38,8 @@ static struct cdevsw echo_cdevsw = {
 
 
 /* vars */
-static struct cdev *echo_dev;
-static const size_t PAYLOAD_LEN=2;
+static struct cdev *severe_dev;
+static const size_t PAYLOAD_LEN=5;
 static char payload[PAYLOAD_LEN];
 
 MALLOC_DECLARE(M_ECHOBUF);
@@ -56,19 +57,19 @@ echo_loader(struct module *m __unused, int what, void *arg __unused)
   switch (what) {
   case MOD_LOAD:                /* kldload */
     error = make_dev_p(MAKEDEV_CHECKNAME | MAKEDEV_WAITOK,
-        &echo_dev,
-        &echo_cdevsw,
+        &severe_dev,
+        &severe_cdevsw,
         0,
         UID_ROOT,
         GID_WHEEL,
         0600,
-        "echo");
+        "lowmem");
     if (error != 0)
       break;
     printf("Echo device loaded.\n");
     break;
   case MOD_UNLOAD:
-    destroy_dev(echo_dev);
+    destroy_dev(severe_dev);
     printf("Echo device unloaded.\n");
     break;
   default:
@@ -107,8 +108,20 @@ echo_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
 {
   int error;
   size_t amt=PAYLOAD_LEN;
-  //The letter 'W' followed by a NULL
-  payload[0] = 'W';
+  //Assign the status bytes
+  payload[0] = 0b0;
+  if(vm_page_count_target())
+    payload[0] |= 0b1;
+
+  if(vm_page_count_min())
+    payload[0] |= 0b01;
+  
+  if(vm_paging_needed() > 0)
+    payload[0] |= 0b001;
+
+  if(vm_page_count_severe() > 0)
+    payload[0] |= 0b0001;
+
   payload[1] = 0x00;
   amt=MIN(uio->uio_resid, uio->uio_offset >= amt + 1 ? 0 :
       amt + 1 - uio->uio_offset);
