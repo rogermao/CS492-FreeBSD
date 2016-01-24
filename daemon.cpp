@@ -34,19 +34,41 @@ memStatus queryDev(){
 	}
 	return status;
 }
-
+/*
+* Memory Conditions:
+* 0 = Severe Low Memory
+* 1 = Under Minimum Free Pages Threshold
+* 2 = Not Enough Free Pages
+*
+*/
 int main(int argc, char ** argv){
-	if(argc != 2){
-		cout << "Incorrect parameters" << endl;
+	if(argc != 3){
+		cout << "Usage: daemon pid memorycondition" << endl;
 		return 1;
 	}
+	int memoryCondition = atoi(argv[2]);
 	while(1){
 		memStatus status = queryDev();
-		if(status.severe){
+		if(status.severe && memoryCondition == 0){
 			//In the future this will be pulled from a data structure
 			int pid = atoi(argv[1]);
 			kill(pid,SIGTEST);
+			cout << "KILLED SEVERE" << endl;
+			break;
 		}
+		if(status.min && memoryCondition == 1){
+			int pid = atoi(argv[1]);
+			kill(pid,SIGTEST);
+			cout << "KILLED MIN" << endl;
+			break;
+		}
+		if(status.needed && memoryCondition == 2){
+			int pid = atoi(argv[1]);
+			kill(pid,SIGTEST);
+			cout << "KILLED NEEDED" << endl;
+			break;
+		}
+		cout << "sleeping ..." << endl;
 		sleep(2);
 	}
 	return 0;
