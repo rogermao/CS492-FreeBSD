@@ -2,11 +2,16 @@
 #include <vector>
 #include <fcntl.h> //Some C libraries are required
 #include <signal.h> //Some C libraries are required
+#include <sys/sysctl.h>
 using namespace std; 
 
 //These signals will eventually come from a .h file
 //44 is a test number, the number used in deployment will require review by an architect
 #define SIGTEST 44
+
+#define MEM_SEVERE 0
+#define MEM_MIN 1
+#define MEM_PAGES_NEEDED 2 
 
 //Track all the markers we want to observe
 struct memStatus{
@@ -34,6 +39,7 @@ memStatus queryDev(){
 	}
 	return status;
 }
+
 /*
 * Memory Conditions:
 * 0 = Severe Low Memory
@@ -47,28 +53,30 @@ int main(int argc, char ** argv){
 		return 1;
 	}
 	int memoryCondition = atoi(argv[2]);
-	while(1){
+	int mib[2], usermem;
+	size_t len;
+	mib[0] = CTL_HW;
+	mib[1] = HW_USERMEM;
+	len = sizeof(usermem);
+	for(;;){
+		sysctl(mib, 2, &usermem, &len, NULL, 0);
+		cout << "Free memory: " << usermem << endl;
 		memStatus status = queryDev();
-		if(status.severe && memoryCondition == 0){
-			//In the future this will be pulled from a data structure
+		if(status.severe && memoryCondition == MEM_SEVERE){
 			int pid = atoi(argv[1]);
 			kill(pid,SIGTEST);
 			cout << "KILLED SEVERE" << endl;
-			break;
 		}
-		if(status.min && memoryCondition == 1){
+		if(status.min && memoryCondition == MEM_MIN){
 			int pid = atoi(argv[1]);
 			kill(pid,SIGTEST);
 			cout << "KILLED MIN" << endl;
-			break;
 		}
-		if(status.needed && memoryCondition == 2){
+		if(status.needed && memoryCondition == MEM_PAGES_NEEDED){
 			int pid = atoi(argv[1]);
 			kill(pid,SIGTEST);
 			cout << "KILLED NEEDED" << endl;
-			break;
 		}
-		cout << "sleeping ..." << endl;
 		sleep(2);
 	}
 	return 0;
