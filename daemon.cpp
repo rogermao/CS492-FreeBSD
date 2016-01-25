@@ -1,12 +1,14 @@
 #include <iostream>
 #include <vector>
+
 #include <fcntl.h> //Some C libraries are required
-#include <signal.h> //Some C libraries are required
-#include <sys/sysctl.h>
 #include <kvm.h>
-#include <vm/vm_param.h>
 #include <libutil.h>
+#include <signal.h>
+
+#include <sys/sysctl.h>
 #include <sys/types.h>
+#include <vm/vm_param.h>
 using namespace std; 
 
 //These signals will eventually come from a .h file
@@ -21,6 +23,7 @@ using namespace std;
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
 static struct kvm_swap swtot;
 static int nswdev;
+
 //Track all the markers we want to observe
 struct memStatus
 {
@@ -108,22 +111,19 @@ static void physmem_sysctl(void)
 	mib[1] = HW_USERMEM;
 	len = sizeof(usermem);
 	sysctl(mib, 2, &usermem, &len, NULL, 0);
-	cout << "Free memory: " << usermem << endl;
+	cout << "Free memory: " << usermem << endl; //change to printf
 }
 /*
 * Memory Conditions:
 * 0 = Severe Low Memory
 * 1 = Under Minimum Free Pages Threshold
 * 2 = Not Enough Free Pages
-*
 */
-
-/* The maximum MIB length for vm.swap_info and an additional device number */
 
 int main(int argc, char ** argv)
 {
 	if(argc != 3){
-		cout << "Usage: daemon pid memorycondition" << endl;
+		cout << "Usage: ./daemon pid memorycondition" << endl;
 		return 1;
 	}
 	int memoryCondition = atoi(argv[2]);
