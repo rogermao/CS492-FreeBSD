@@ -5,9 +5,11 @@
 #include <kvm.h>
 #include <libutil.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #include <sys/sysctl.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 #include <vm/vm_param.h>
 using namespace std; 
 
@@ -15,14 +17,16 @@ using namespace std;
 //44 is a test number, the number used in deployment will require review by an architect
 #define SIGTEST 44
 
-#define MEM_SEVERE 0
-#define MEM_MIN 1
-#define MEM_PAGES_NEEDED 2 
+#define SIGSEVERE 45
+#define SIGMIN 46
+#define SIGPAGESNEEDED 47 
 
 #define CONVERT(v)	((int64_t)(v) * pagesize / blocksize)
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
 static struct kvm_swap swtot;
 static int nswdev;
+static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
+static struct slisthead *headp;
 
 //Track all the markers we want to observe
 struct memStatus
@@ -30,7 +34,11 @@ struct memStatus
 	bool target, min, needed, severe;
 };
 
-
+struct managed_application
+{
+	int pid, condition;
+	SLIST_ENTRY(managed_application) next_application;
+};
 //Query the device for updates statuses. 
 memStatus queryDev()
 {
@@ -41,13 +49,13 @@ memStatus queryDev()
 		char buf;
 		//If the transfer worked
 		if (read(devfile,&buf,1)) {
-		    if(buf & 0b1)
+		    if(buf & 0b1){
 		    	status.target=true;
-		    if(buf & 0b01)
+		    if(buf & 0b10){
 		    	status.min=true;
-		    if(buf & 0b001)
+		    if(buf & 0b100)
 		    	status.needed=true;
-		    if(buf & 0b0001) 
+		    if(buf & 0b1000) {
 		    	status.severe=true;
 		}
 	}
@@ -67,14 +75,14 @@ static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bus
 	header = getbsize(&hlen, &blocksize);
 		
 
-	(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
+//	(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
 	
-	printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
+//	printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
 	humanize_number(usedbuf, sizeof(usedbuf), CONVERT_BLOCKS(bused), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
 	humanize_number(availbuf, sizeof(availbuf), CONVERT_BLOCKS(bavail), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
-	printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
+//	printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
 }
 
 static void swapmode_sysctl(void)
@@ -111,8 +119,19 @@ static void physmem_sysctl(void)
 	mib[1] = HW_USERMEM;
 	len = sizeof(usermem);
 	sysctl(mib, 2, &usermem, &len, NULL, 0);
-	cout << "Free memory: " << usermem << endl; //change to printf
+//	cout << "Free memory: " << usermem << endl; //change to printf
 }
+
+void monitor_application(int signal_number, siginfo_t *info, void *unused){
+	struct managed_application *application = (managed_application*)malloc(sizeof(struct managed_application));
+	application->pid = info->si_pid;	
+	application->condition = signal_number;
+	SLIST_INSERT_HEAD(&head, application, next_application);
+	printf("REGISTERED\n");
+}
+
+
+
 /*
 * Memory Conditions:
 * 0 = Severe Low Memory
@@ -122,29 +141,44 @@ static void physmem_sysctl(void)
 
 int main(int argc, char ** argv)
 {
+	//	daemon(0,0);
+	
 	if(argc != 3){
 		cout << "Usage: ./daemon pid memorycondition" << endl;
 		return 1;
 	}
 	int memoryCondition = atoi(argv[2]);
+
+	struct sigaction sig;
+	sig.sa_sigaction = monitor_application;
+	sig.sa_flags = SA_SIGINFO;
+	sigaction(SIGSEVERE, &sig, NULL);
+	sigaction(SIGMIN, &sig, NULL);
+		
+
+	SLIST_INIT(&head);
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	
 	for(;;){
 		swapmode_sysctl();
 		physmem_sysctl();
 		memStatus status = queryDev();
-		if(status.severe && memoryCondition == MEM_SEVERE){
-			int pid = atoi(argv[1]);
-			kill(pid,SIGTEST);
-			cout << "KILLED SEVERE" << endl;
-		}
-		if(status.min && memoryCondition == MEM_MIN){
-			int pid = atoi(argv[1]);
-			kill(pid,SIGTEST);
-			cout << "KILLED MIN" << endl;
-		}
-		if(status.needed && memoryCondition == MEM_PAGES_NEEDED){
-			int pid = atoi(argv[1]);
-			kill(pid,SIGTEST);
-			cout << "KILLED NEEDED" << endl;
+		SLIST_FOREACH(current_application, &head, next_application){
+			if(status.severe && current_application->condition == SIGSEVERE){
+				int pid = current_application->pid;
+				kill(pid,SIGTEST);
+				printf("KILLED SEVERE: %d\n", pid);
+			}
+			if(status.min && current_application->condition == SIGMIN){
+				int pid = current_application->pid;
+				kill(pid,SIGTEST);
+				printf("KILLED MIN: %d\n", pid);
+			}
+			if(status.needed && memoryCondition == SIGPAGESNEEDED){
+				int pid = current_application->pid;
+				kill(pid,SIGTEST);
+				printf("KILLED PAGES NEEDED: %d\n", pid);
+			}
 		}
 		sleep(2);
 	}
