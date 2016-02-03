@@ -49,13 +49,13 @@ memStatus queryDev()
 		char buf;
 		//If the transfer worked
 		if (read(devfile,&buf,1)) {
-		    if(buf & 0b1){
+		    if(buf & 0b1)
 		    	status.target=true;
-		    if(buf & 0b10){
+		    if(buf & 0b10)
 		    	status.min=true;
 		    if(buf & 0b100)
 		    	status.needed=true;
-		    if(buf & 0b1000) {
+		    if(buf & 0b1000)
 		    	status.severe=true;
 		}
 	}
@@ -141,7 +141,7 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 
 int main(int argc, char ** argv)
 {
-	//	daemon(0,0);
+	daemon(0,0);
 	
 	if(argc != 3){
 		cout << "Usage: ./daemon pid memorycondition" << endl;
