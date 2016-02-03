@@ -109,13 +109,13 @@ lowmem_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
     payload[0] |= 0b1;
 
   if(vm_page_count_min())
-    payload[0] |= 0b01;
+    payload[0] |= 0b10;
   
   if(vm_paging_target() > 0)
-    payload[0] |= 0b001;
+    payload[0] |= 0b100;
 
-  if(vm_paging_needed())
-    payload[0] |= 0b0001;
+  if(vm_page_count_severe())
+    payload[0] |= 0b1000;
 
   payload[1] = 0x00;
   amt=MIN(uio->uio_resid, uio->uio_offset >= amt + 1 ? 0 :
