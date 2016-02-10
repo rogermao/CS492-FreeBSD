@@ -143,8 +143,8 @@ int main(int argc, char ** argv)
 {
 	daemon(0,0);
 	
-	if(argc != 3){
-		cout << "Usage: ./daemon pid memorycondition" << endl;
+	if(argc != 1){
+		cout << "Usage: ./daemon" << endl;
 		return 1;
 	}
 	int memoryCondition = atoi(argv[2]);
