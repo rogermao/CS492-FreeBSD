@@ -10,7 +10,9 @@
 #include <fcntl.h>
 
 #define SIGTEST 44
-
+#define SIGSEVERE 45
+#define SIGMIN 46
+#define SIGPAGESNEEDED 47
 volatile int pausevar = 0;
 sem_t sem;
 
@@ -25,6 +27,19 @@ void receiveData(int n, siginfo_t *info, void *unused) {
 int main(int argc, char **argv){
 	//Init the semaphore
     sem_init(&sem,1,1) ;
+	if (argc != 3){
+		printf("usage: pid signal\n");
+		return -1;
+	}
+	//register to be monitored for severe alerts
+	int pid = atoi(argv[1]);
+	int signal = atoi(argv[2]);
+	if (signal == SIGSEVERE)
+		kill(pid, SIGSEVERE);
+	if (signal == SIGMIN)
+		kill(pid, SIGMIN);
+	if (signal == SIGPAGESNEEDED)
+		kill(pid, SIGMIN);
 
     //Assign the handler for SIGTEST
 	struct sigaction sig;
