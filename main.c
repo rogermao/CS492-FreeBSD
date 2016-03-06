@@ -41,6 +41,7 @@ static struct cdevsw severe_cdevsw = {
 static struct cdev *severe_dev;
 static const size_t PAYLOAD_LEN=5;
 static char payload[PAYLOAD_LEN];
+static char previous_payload[PAYLOAD_LEN];
 
 MALLOC_DECLARE(M_LOWMEMBUF);
 MALLOC_DEFINE(M_LOWMEMBUF, "lowmembuffer", "buffer for lowmem module");
@@ -101,9 +102,10 @@ lowmem_close(struct cdev *dev __unused, int fflag __unused, int devtype __unused
 static int
 lowmem_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
 {
-  int error;
+  int error = 0;
   size_t amt=PAYLOAD_LEN;
   //Assign the status bytes
+  previous_payload[0] = payload[0];
   payload[0] = 0b0;
   if(vm_page_count_target())
     payload[0] |= 0b1;
@@ -120,8 +122,7 @@ lowmem_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
   payload[1] = 0x00;
   amt=MIN(uio->uio_resid, uio->uio_offset >= amt + 1 ? 0 :
       amt + 1 - uio->uio_offset);
-  if ((error = uiomove(payload, amt, uio)) != 0){}
-
+	if ((error = uiomove(payload, amt, uio)) != 0){}
   return (error);
 }
 

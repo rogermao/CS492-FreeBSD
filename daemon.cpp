@@ -7,7 +7,9 @@
 #include <signal.h>
 #include <stdlib.h>
 
+#include <sys/event.h>
 #include <sys/sysctl.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <vm/vm_param.h>
@@ -123,11 +125,25 @@ static void physmem_sysctl(void)
 }
 
 void monitor_application(int signal_number, siginfo_t *info, void *unused){
+	
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	struct managed_application *np_temp = (managed_application*)malloc(sizeof(struct managed_application));
 	struct managed_application *application = (managed_application*)malloc(sizeof(struct managed_application));
-	application->pid = info->si_pid;	
-	application->condition = signal_number;
-	SLIST_INSERT_HEAD(&head, application, next_application);
-	printf("REGISTERED\n");
+	
+	if (SLIST_FIRST(&head) != NULL){
+		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
+			if (current_application->pid == info->si_pid){
+				SLIST_REMOVE(&head, current_application, managed_application, next_application);
+				printf("DEREGISTERED\n");
+				return;
+			}	
+		}
+	}
+		application->pid = info->si_pid;	
+		application->condition = signal_number;
+		SLIST_INSERT_HEAD(&head, application, next_application);
+		printf("REGISTERED\n");
+
 }
 
 
@@ -141,12 +157,15 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 
 int main(int argc, char ** argv)
 {
-	daemon(0,0);
-	
-	if(argc != 1){
-		cout << "Usage: ./daemon" << endl;
-		return 1;
+	if (argc != 1){
+		printf("Args: %d\n", argc);
+		return -1;
 	}
+
+	
+
+//	daemon(0,0);
+	
 	int memoryCondition = atoi(argv[2]);
 
 	struct sigaction sig;
@@ -155,7 +174,6 @@ int main(int argc, char ** argv)
 	sigaction(SIGSEVERE, &sig, NULL);
 	sigaction(SIGMIN, &sig, NULL);
 		
-
 	SLIST_INIT(&head);
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
 	
