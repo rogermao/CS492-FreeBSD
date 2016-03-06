@@ -136,7 +136,11 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 				SLIST_REMOVE(&head, current_application, managed_application, next_application);
 				printf("DEREGISTERED\n");
 				return;
-			}	
+			}
+			if (kill(current_application->pid,0)==-1){
+				SLIST_REMOVE(&head, current_application, managed_application, next_application);
+				printf("TIMED OUT\n");
+			}
 		}
 	}
 		application->pid = info->si_pid;	
