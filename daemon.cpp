@@ -7,16 +7,17 @@
 #include <signal.h>
 #include <stdlib.h>
 
+#include <arpa/inet.h>
 #include <sys/event.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/wait.h>
 #include <vm/vm_param.h>
 using namespace std; 
 
-//These signals will eventually come from a .h file
-//44 is a test number, the number used in deployment will require review by an architect
+#define PORT "9100" //the port applications will connect to
 #define SIGTEST 44
 
 #define SIGSEVERE 45
@@ -62,6 +63,14 @@ memStatus queryDev()
 		}
 	}
 	return status;
+}
+
+void *get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET){
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
 static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bused, intmax_t bavail, float bpercent)
@@ -125,6 +134,8 @@ static void physmem_sysctl(void)
 }
 
 void monitor_application(int signal_number, siginfo_t *info, void *unused){
+
+
 	
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
 	struct managed_application *np_temp = (managed_application*)malloc(sizeof(struct managed_application));
@@ -179,6 +190,7 @@ int main(int argc, char ** argv)
 	sig.sa_flags = SA_SIGINFO;
 	sigaction(SIGSEVERE, &sig, NULL);
 	sigaction(SIGMIN, &sig, NULL);
+	sigaction(PORT, &sig, NULL);
 		
 	SLIST_INIT(&head);
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
