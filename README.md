@@ -7,6 +7,6 @@ sudo kldload ./main.ko
 clang++ daemon.cpp -lutil -o daemon
 ./daemon
 clang memhog.c -o memhog
-sudo ./memhog [daemon pid] 
+sudo ./memhog [daemon pid] [signal #]
 
  
