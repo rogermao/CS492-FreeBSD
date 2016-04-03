@@ -187,21 +187,28 @@ int main(int argc, char ** argv)
 		swapmode_sysctl();
 		physmem_sysctl();
 		memStatus status = queryDev();
-		SLIST_FOREACH(current_application, &head, next_application){
-			if(status.severe && current_application->condition == SIGSEVERE){
-				int pid = current_application->pid;
-				kill(pid,SIGTEST);
-				printf("KILLED SEVERE: %d\n", pid);
-			}
-			if(status.min && current_application->condition == SIGMIN){
-				int pid = current_application->pid;
-				kill(pid,SIGTEST);
-				printf("KILLED MIN: %d\n", pid);
-			}
-			if(status.needed && memoryCondition == SIGPAGESNEEDED){
-				int pid = current_application->pid;
-				kill(pid,SIGTEST);
-				printf("KILLED PAGES NEEDED: %d\n", pid);
+		if (status.severe || status.min || status.needed){
+			struct timespec sleepFor;
+			SLIST_FOREACH(current_application, &head, next_application){
+				int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
+				sleepFor.tv_sec = 0;
+				sleepFor.tv_nsec = randomMilliseconds;
+				if(status.severe && current_application->condition == SIGSEVERE){
+					int pid = current_application->pid;
+					kill(pid,SIGTEST);
+					printf("KILLED SEVERE: %d\n", pid);
+				}
+				if(status.min && current_application->condition == SIGMIN){
+					int pid = current_application->pid;
+					kill(pid,SIGTEST);
+					printf("KILLED MIN: %d\n", pid);
+				}
+				if(status.needed && memoryCondition == SIGPAGESNEEDED){
+					int pid = current_application->pid;
+					kill(pid,SIGTEST);
+					printf("KILLED PAGES NEEDED: %d\n", pid);
+				}
+				nanosleep(&sleepFor, 0);
 			}
 		}
 		sleep(2);
