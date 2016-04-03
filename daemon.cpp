@@ -33,7 +33,7 @@ static struct slisthead *headp;
 //Track all the markers we want to observe
 struct memStatus
 {
-	bool target, min, needed, severe;
+	bool target, min, needed, severe, swap_low;
 };
 
 struct managed_application
@@ -44,21 +44,28 @@ struct managed_application
 //Query the device for updates statuses. 
 memStatus queryDev()
 {
-	memStatus status = {false,false,false,false};
+	memStatus status = {false,false,false,false,false};
 	// Read the file, C++ libraries are no good for reading from a device
 	int devfile = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
 	if(devfile >= 0){
-		char buf;
+		char buf[5+sizeof(int)];
+		int bytesRead=0;
+		int swap_space=0;
 		//If the transfer worked
-		if (read(devfile,&buf,1)) {
-		    if(buf & 0b1)
+		
+		if ((bytesRead = read(devfile,&buf,2))) {
+		    if(buf[0] & 0b1)
 		    	status.target=true;
-		    if(buf & 0b10)
+		    if(buf[0] & 0b10)
 		    	status.min=true;
-		    if(buf & 0b100)
+		    if(buf[0] & 0b100)
 		    	status.needed=true;
-		    if(buf & 0b1000)
+		    if(buf[0] & 0b1000)
 		    	status.severe=true;
+		    memcpy(&swap_space, &buf[1], sizeof(int));
+		    if(swap_space<128){
+			status.swap_low=true;
+			}
 		}
 	}
 	return status;
@@ -77,14 +84,14 @@ static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bus
 	header = getbsize(&hlen, &blocksize);
 		
 
-//	(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
+	(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
 	
-//	printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
+	printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
 	humanize_number(usedbuf, sizeof(usedbuf), CONVERT_BLOCKS(bused), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
 	humanize_number(availbuf, sizeof(availbuf), CONVERT_BLOCKS(bavail), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
-//	printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
+	printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
 }
 
 static void swapmode_sysctl(void)
@@ -209,7 +216,7 @@ int main(int argc, char ** argv)
 				nanosleep(&sleepFor, 0);
 			}
 			status = queryDev();
-			if (status.severe){
+			if (status.severe || status.swap_low){
 				SLIST_FOREACH(current_application, &head, next_application){
 					int pid = current_application->pid;
 					kill(pid, SIGSTOP);
@@ -219,6 +226,7 @@ int main(int argc, char ** argv)
 					int pid = current_application->pid;
 					kill(pid, SIGCONT);
 					int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
+					printf("CONTINUED: %d\n", pid);
 					sleepFor.tv_sec = 0;
 					sleepFor.tv_nsec = randomMilliseconds;
 					nanosleep(&sleepFor, 0);

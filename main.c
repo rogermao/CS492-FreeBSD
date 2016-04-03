@@ -17,8 +17,11 @@
 #include <sys/uio.h>    /* uio struct */
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
-
+#include <vm/vm.h>
+#include <vm/swap_pager.h>
 #define BUFFERSIZE 255
+
+extern int swap_pager_avail;
 
 /* Function prototypes */
 static d_open_t      lowmem_open;
@@ -40,11 +43,12 @@ static struct cdevsw severe_cdevsw = {
 /* vars */
 static struct cdev *severe_dev;
 static const size_t PAYLOAD_LEN=5;
-static char payload[PAYLOAD_LEN];
-static char previous_payload[PAYLOAD_LEN];
+static char payload[PAYLOAD_LEN + sizeof(int)];
 
 MALLOC_DECLARE(M_LOWMEMBUF);
 MALLOC_DEFINE(M_LOWMEMBUF, "lowmembuffer", "buffer for lowmem module");
+
+
 
 /*
  * This function is called by the kld[un]load(2) system calls to
@@ -105,7 +109,6 @@ lowmem_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
   int error = 0;
   size_t amt=PAYLOAD_LEN;
   //Assign the status bytes
-  previous_payload[0] = payload[0];
   payload[0] = 0b0;
   if(vm_page_count_target())
     payload[0] |= 0b1;
@@ -118,8 +121,7 @@ lowmem_read(struct cdev *dev __unused, struct uio *uio, int ioflag __unused)
 
   if(vm_page_count_severe())
     payload[0] |= 0b1000;
-
-  payload[1] = 0x00;
+  memcpy(&payload[1], &swap_pager_avail, sizeof(int));
   amt=MIN(uio->uio_resid, uio->uio_offset >= amt + 1 ? 0 :
       amt + 1 - uio->uio_offset);
 	if ((error = uiomove(payload, amt, uio)) != 0){}
