@@ -9,4 +9,5 @@ clang++ daemon.cpp -lutil -o daemon
 clang memhog.c -o memhog
 sudo ./memhog [daemon pid] [signal #]
 
- 
+clang -o registration_test -I/usr/local/unclude -L/usr/local/lib registration_test.c -latf-c 
+kyua test
