@@ -50,10 +50,11 @@ memStatus queryDev()
 	if(devfile >= 0){
 		char buf[5+sizeof(int)];
 		int bytesRead=0;
+		int swap_pages=0;
 		int swap_space=0;
 		//If the transfer worked
 		
-		if ((bytesRead = read(devfile,&buf,2))) {
+		if ((bytesRead = read(devfile,&buf,100))) {
 		    if(buf[0] & 0b1)
 		    	status.target=true;
 		    if(buf[0] & 0b10)
@@ -62,9 +63,12 @@ memStatus queryDev()
 		    	status.needed=true;
 		    if(buf[0] & 0b1000)
 		    	status.severe=true;
-		    memcpy(&swap_space, &buf[1], sizeof(int));
-		    if(swap_space<128){
+		    memcpy(&swap_pages, &buf[1], sizeof(int));
+		    swap_space = swap_pages * getpagesize();
+		    printf("swap_space: %d\n", swap_space);
+		    if(swap_space<250000000){
 			status.swap_low=true;
+			printf("LOW SWAP!!\n");
 			}
 		}
 	}
@@ -203,12 +207,8 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	
-
 //	daemon(0,0);
 	
-	int memoryCondition = atoi(argv[2]);
-
 	struct sigaction sig;
 	sig.sa_sigaction = monitor_application;
 	sig.sa_flags = SA_SIGINFO;
@@ -242,7 +242,6 @@ int main(int argc, char ** argv)
 			}
 			status = queryDev();
 			if (status.severe || status.swap_low){
-				
 				suspend_applications();
 				resume_applications();
 			}
