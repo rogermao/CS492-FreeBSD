@@ -159,6 +159,15 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 
 }
 
+void random_millisecond_sleep(int min, int max)
+{
+	struct timespec sleepFor;
+	int randomMilliseconds = ((rand() % max)+min) * 1000 * 1000;
+	sleepFor.tv_sec = 0;
+	sleepFor.tv_nsec = randomMilliseconds;
+	nanosleep(&sleepFor, 0);
+}
+
 void suspend_applications()
 {
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
@@ -166,6 +175,17 @@ void suspend_applications()
 		int pid = current_application->pid;
 		kill(pid, SIGSTOP);
 		printf("SUSPENDED: %d\n", pid);
+	}
+}
+
+void resume_applications()
+{
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	SLIST_FOREACH(current_application, &head, next_application){
+		int pid = current_application->pid;
+		kill(pid, SIGCONT);
+		printf("CONTINUED: %d\n", pid);
+		random_millisecond_sleep(0,1000);
 	}
 }
 
@@ -227,15 +247,7 @@ int main(int argc, char ** argv)
 			if (status.severe || status.swap_low){
 				
 				suspend_applications();
-				SLIST_FOREACH(current_application, &head, next_application){
-					int pid = current_application->pid;
-					kill(pid, SIGCONT);
-					int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
-					printf("CONTINUED: %d\n", pid);
-					sleepFor.tv_sec = 0;
-					sleepFor.tv_nsec = randomMilliseconds;
-					nanosleep(&sleepFor, 0);
-				}
+				resume_applications();
 			}
 			
 		}
