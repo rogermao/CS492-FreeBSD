@@ -17,6 +17,6 @@ sudo ./memhog [daemon pid] [signal #]
 
 4/3
 
-clang -o registration_test -I/usr/local/unclude -L/usr/local/lib registration_test.c -latf-c 
+clang -o registration_test -I/usr/local/include -L/usr/local/lib registration_test.c -latf-c 
 
 kyua test
