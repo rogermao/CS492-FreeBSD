@@ -22,6 +22,7 @@ using namespace std;
 #define SIGSEVERE 45
 #define SIGMIN 46
 #define SIGPAGESNEEDED 47 
+#define SIGREGISTERED 48 
 
 #define CONVERT(v)	((int64_t)(v) * pagesize / blocksize)
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
@@ -155,6 +156,7 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 	application->pid = info->si_pid;	
 	application->condition = signal_number;
 	SLIST_INSERT_HEAD(&head, application, next_application);
+	kill(applicaiton->pid, SIGREGISTERED);
 	printf("REGISTERED\n");
 
 }
