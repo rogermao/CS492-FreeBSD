@@ -159,7 +159,15 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 
 }
 
-
+void suspend_applications()
+{
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	SLIST_FOREACH(current_application, &head, next_application){
+		int pid = current_application->pid;
+		kill(pid, SIGSTOP);
+		printf("SUSPENDED: %d\n", pid);
+	}
+}
 
 /*
 * Memory Conditions:
@@ -217,11 +225,8 @@ int main(int argc, char ** argv)
 			}
 			status = queryDev();
 			if (status.severe || status.swap_low){
-				SLIST_FOREACH(current_application, &head, next_application){
-					int pid = current_application->pid;
-					kill(pid, SIGSTOP);
-					printf("SUSPENDED: %d\n", pid);
-				}
+				
+				suspend_applications();
 				SLIST_FOREACH(current_application, &head, next_application){
 					int pid = current_application->pid;
 					kill(pid, SIGCONT);
