@@ -223,11 +223,7 @@ int main(int argc, char ** argv)
 		physmem_sysctl();
 		memStatus status = queryDev();
 		if (status.severe || status.min || status.needed){
-			struct timespec sleepFor;
 			SLIST_FOREACH(current_application, &head, next_application){
-				int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
-				sleepFor.tv_sec = 0;
-				sleepFor.tv_nsec = randomMilliseconds;
 				int pid = current_application->pid;
 				if(status.severe && current_application->condition == SIGSEVERE){
 					kill(pid,SIGTEST);
@@ -241,7 +237,7 @@ int main(int argc, char ** argv)
 					kill(pid,SIGTEST);
 					printf("KILLED PAGES NEEDED: %d\n", pid);
 				}
-				nanosleep(&sleepFor, 0);
+				random_millisecond_sleep(0,1000);
 			}
 			status = queryDev();
 			if (status.severe || status.swap_low){
