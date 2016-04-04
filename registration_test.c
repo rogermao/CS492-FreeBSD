@@ -56,6 +56,34 @@ ATF_TC_BODY(registration, tc)
 	}	
 }
 
+ATF_TC(deregistration);
+ATF_TC_HEAD(deregistration, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "This tests deregistration of applications");
+}
+ATF_TC_BODY(deregistration, tc)
+{
+	sem_init(&sem,1,1);	
+	FILE *in = popen("pgrep daemon","r");
+	int pid;
+	char line[20];
+	fgets(line, 20, in);
+	sscanf(line, "%d", &pid);
+	printf("daemon pid: %d", pid);
+
+	struct sigaction sig;
+	sig.sa_sigaction = receiveRegistrationSig;
+	sig.sa_flags = SA_SIGINFO;
+	sigaction(SIGREGISTERED, &sig, NULL);
+
+	kill(pid, SIGSEVERE);
+
+	//Todo
+	//Add deregistration signal
+	//Add callback function to receive deregistration signal	
+	
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, registration);
