@@ -214,6 +214,7 @@ int main(int argc, char ** argv)
 	sig.sa_flags = SA_SIGINFO;
 	sigaction(SIGSEVERE, &sig, NULL);
 	sigaction(SIGMIN, &sig, NULL);
+	sigaction(SIGPAGESNEEDED, &sig, NULL);
 		
 	SLIST_INIT(&head);
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
@@ -233,7 +234,7 @@ int main(int argc, char ** argv)
 					kill(pid,SIGTEST);
 					printf("KILLED MIN: %d\n", pid);
 				}
-				if(status.needed && memoryCondition == SIGPAGESNEEDED){
+				if(status.needed && current_application->condition == SIGPAGESNEEDED){
 					kill(pid,SIGTEST);
 					printf("KILLED PAGES NEEDED: %d\n", pid);
 				}
