@@ -23,7 +23,7 @@ using namespace std;
 #define SIGMIN 46
 #define SIGPAGESNEEDED 47 
 #define SIGREGISTERED 48 
-#define SIGDEREGISTERED 48 
+#define SIGDEREGISTERED 49 
 
 #define CONVERT(v)	((int64_t)(v) * pagesize / blocksize)
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)

@@ -52,7 +52,7 @@ static int registerApp(int pid){
 	bool success = false;
 
 	while(i < timeoutCount && !success){
-		usleep(sleepInterval);
+		nanosleep(sleepInterval);
 		if(registered)
 		{
 			success = true;
@@ -79,7 +79,7 @@ static int deregisterApp(int pid)
 	bool success = false;
 
 	while(i < timeoutCount && !success){
-		usleep(sleepInterval);
+		nanosleep(sleepInterval);
 		if(!registered)
 		{
 			success = true;
