@@ -22,6 +22,8 @@ using namespace std;
 #define SIGSEVERE 45
 #define SIGMIN 46
 #define SIGPAGESNEEDED 47 
+#define SIGREGISTERED 48 
+#define SIGDEREGISTERED 49 
 
 #define CONVERT(v)	((int64_t)(v) * pagesize / blocksize)
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
@@ -145,6 +147,8 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
 			if (current_application->pid == info->si_pid){
 				SLIST_REMOVE(&head, current_application, managed_application, next_application);
+	
+				kill(current_application->pid, SIGDEREGISTERED);
 				free(current_application);
 				printf("DEREGISTERED\n");
 				return;
@@ -159,6 +163,7 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 	application->pid = info->si_pid;	
 	application->condition = signal_number;
 	SLIST_INSERT_HEAD(&head, application, next_application);
+	kill(application->pid, SIGREGISTERED);
 	printf("REGISTERED\n");
 
 }
