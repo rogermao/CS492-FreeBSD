@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <fcntl.h>
 
+#include "daemon.h"
+
 #define SIGTEST 44
 #define SIGSEVERE 45
 #define SIGMIN 46
@@ -47,13 +49,16 @@ static int registerApp(int pid){
 	kill(pid, SIGSEVERE);
 
 	int i = 0;
-	int sleepInterval = 1000000;
+	struct timespec sleepInterval;
+	sleepInterval.tv_sec = 1;
+	sleepInterval.tv_nsec = 0;
+
 	int timeoutCount = 10;
 	bool success = false;
 
 	while(i < timeoutCount && !success){
-		nanosleep(sleepInterval);
-		if(registered)
+		nanosleep(&sleepInterval, 0);
+		if(isRegistered(pid))
 		{
 			success = true;
 		}	
@@ -74,12 +79,15 @@ static int deregisterApp(int pid)
 	kill(pid, SIGSEVERE);
 	
 	int i = 0;
-	int sleepInterval = 1000000;
+	struct timespec sleepInterval;
+	sleepInterval.tv_sec = 1;
+	sleepInterval.tv_nsec = 0;
+	
 	int timeoutCount = 10;
 	bool success = false;
 
 	while(i < timeoutCount && !success){
-		nanosleep(sleepInterval);
+		nanosleep(&sleepInterval, 0);
 		if(!registered)
 		{
 			success = true;
@@ -106,16 +114,16 @@ ATF_TC_BODY(registration, tc)
 	sem_init(&sem,1,1);	
 	int pid = getDaemonPID();
 	
-	struct sigaction sig;
-	sig.sa_sigaction = receiveRegistrationSig;
-	sig.sa_flags = SA_SIGINFO;
-	sigaction(SIGREGISTERED, &sig, NULL);
+	//struct sigaction sig;
+	//sig.sa_sigaction = receiveRegistrationSig;
+	//sig.sa_flags = SA_SIGINFO;
+	//sigaction(SIGREGISTERED, &sig, NULL);
 
 	int result = registerApp(pid);
 
-	signal(SIGREGISTERED, SIG_DFL);
+	//signal(SIGREGISTERED, SIG_DFL);
 
-	if(1){
+	if(result){
 		atf_tc_pass();
 	}
 	else{
@@ -175,7 +183,7 @@ ATF_TC_BODY(deregistration, tc)
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, registration);
-	ATF_TP_ADD_TC(tp, deregistration);
+	//ATF_TP_ADD_TC(tp, deregistration);
 	
 	return atf_no_error();
 }
