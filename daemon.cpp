@@ -68,10 +68,11 @@ memStatus queryDev()
 	if(devfile >= 0){
 		char buf[5+sizeof(int)];
 		int bytesRead=0;
+		int swap_pages=0;
 		int swap_space=0;
 		//If the transfer worked
 		
-		if ((bytesRead = read(devfile,&buf,2))) {
+		if ((bytesRead = read(devfile,&buf,100))) {
 		    if(buf[0] & 0b1)
 		    	status.target=true;
 		    if(buf[0] & 0b10)
@@ -80,9 +81,12 @@ memStatus queryDev()
 		    	status.needed=true;
 		    if(buf[0] & 0b1000)
 		    	status.severe=true;
-		    memcpy(&swap_space, &buf[1], sizeof(int));
-		    if(swap_space<128){
+		    memcpy(&swap_pages, &buf[1], sizeof(int));
+		    swap_space = swap_pages * getpagesize();
+		    printf("swap_space: %d\n", swap_space);
+		    if(swap_space<250000000){
 			status.swap_low=true;
+			printf("LOW SWAP!!\n");
 			}
 		}
 	}
@@ -180,7 +184,35 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 
 }
 
+void random_millisecond_sleep(int min, int max)
+{
+	struct timespec sleepFor;
+	int randomMilliseconds = ((rand() % max)+min) * 1000 * 1000;
+	sleepFor.tv_sec = 0;
+	sleepFor.tv_nsec = randomMilliseconds;
+	nanosleep(&sleepFor, 0);
+}
 
+void suspend_applications()
+{
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	SLIST_FOREACH(current_application, &head, next_application){
+		int pid = current_application->pid;
+		kill(pid, SIGSTOP);
+		printf("SUSPENDED: %d\n", pid);
+	}
+}
+
+void resume_applications()
+{
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	SLIST_FOREACH(current_application, &head, next_application){
+		int pid = current_application->pid;
+		kill(pid, SIGCONT);
+		printf("CONTINUED: %d\n", pid);
+		random_millisecond_sleep(0,1000);
+	}
+}
 
 /*
 * Memory Conditions:
@@ -196,17 +228,14 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	
-
 //	daemon(0,0);
 	
-	int memoryCondition = atoi(argv[2]);
-
 	struct sigaction sig;
 	sig.sa_sigaction = monitor_application;
 	sig.sa_flags = SA_SIGINFO;
 	sigaction(SIGSEVERE, &sig, NULL);
 	sigaction(SIGMIN, &sig, NULL);
+	sigaction(SIGPAGESNEEDED, &sig, NULL);
 		
 	SLIST_INIT(&head);
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
@@ -216,11 +245,7 @@ int main(int argc, char ** argv)
 		physmem_sysctl();
 		memStatus status = queryDev();
 		if (status.severe || status.min || status.needed){
-			struct timespec sleepFor;
 			SLIST_FOREACH(current_application, &head, next_application){
-				int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
-				sleepFor.tv_sec = 0;
-				sleepFor.tv_nsec = randomMilliseconds;
 				int pid = current_application->pid;
 				if(status.severe && current_application->condition == SIGSEVERE){
 					kill(pid,SIGTEST);
@@ -230,28 +255,16 @@ int main(int argc, char ** argv)
 					kill(pid,SIGTEST);
 					printf("KILLED MIN: %d\n", pid);
 				}
-				if(status.needed && memoryCondition == SIGPAGESNEEDED){
+				if(status.needed && current_application->condition == SIGPAGESNEEDED){
 					kill(pid,SIGTEST);
 					printf("KILLED PAGES NEEDED: %d\n", pid);
 				}
-				nanosleep(&sleepFor, 0);
+				random_millisecond_sleep(0,1000);
 			}
 			status = queryDev();
 			if (status.severe || status.swap_low){
-				SLIST_FOREACH(current_application, &head, next_application){
-					int pid = current_application->pid;
-					kill(pid, SIGSTOP);
-					printf("SUSPENDED: %d\n", pid);
-				}
-				SLIST_FOREACH(current_application, &head, next_application){
-					int pid = current_application->pid;
-					kill(pid, SIGCONT);
-					int randomMilliseconds = (rand() % 1000) * 1000 * 1000;		
-					printf("CONTINUED: %d\n", pid);
-					sleepFor.tv_sec = 0;
-					sleepFor.tv_nsec = randomMilliseconds;
-					nanosleep(&sleepFor, 0);
-				}
+				suspend_applications();
+				resume_applications();
 			}
 			
 		}
