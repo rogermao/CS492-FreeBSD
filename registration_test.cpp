@@ -246,6 +246,34 @@ ATF_TEST_CASE_BODY(sigcont)
 
 
 }
+ATF_TEST_CASE(timeout);
+ATF_TEST_CASE_HEAD(timeout)
+{
+	set_md_var("descr", "This test the proper deregistration of timedout/killed functions");
+}
+ATF_TEST_CASE_BODY(timeout)
+{
+	int child_pid = fork();
+	
+	int result = registerApp(child_pid, SIGSEVERE);
+
+	if(result == 0){
+		ATF_FAIL("Registration Failed");	
+	}	
+
+	kill(child_pid, SIGKILL);	
+
+	result = registerApp(child_pid, SIGSEVERE);
+
+	if(!result){
+		ATF_PASS();
+	}
+	else{
+		ATF_FAIL("Not Deregistered");
+	}
+
+}
+
 ATF_INIT_TEST_CASES(tcs)
 {
 	ATF_ADD_TEST_CASE(tcs, deregistration);
@@ -254,4 +282,5 @@ ATF_INIT_TEST_CASES(tcs)
 	ATF_ADD_TEST_CASE(tcs, sigpagesneeded);
 	//ATF_ADD_TEST_CASE(tcs, sigstop);
 	ATF_ADD_TEST_CASE(tcs, sigcont);
+	ATF_ADD_TEST_CASE(tcs, timeout);
 }
