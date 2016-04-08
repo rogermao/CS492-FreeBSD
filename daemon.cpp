@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 
+#include "application.cpp"
+
 #include <fcntl.h> //Some C libraries are required
 #include <kvm.h>
 #include <libutil.h>
@@ -32,32 +34,17 @@ static int nswdev;
 static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
 static struct slisthead *headp;
 
-//Track all the markers we want to observe
-struct memStatus
-{
-	bool target, min, needed, severe, swap_low;
-};
-
 struct managed_application
 {
 	int pid, condition;
 	SLIST_ENTRY(managed_application) next_application;
 };
 
-int isRegistered(int pid){
-
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
-	struct managed_application *np_temp = (managed_application*)malloc(sizeof(struct managed_application));
-	
-	if (SLIST_FIRST(&head) != NULL){
-		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
-			if (current_application->pid == pid){
-				return true;				
-			}
-		}
-	}
-	return false;	
-}
+//Track all the markers we want to observe
+struct memStatus
+{
+	bool target, min, needed, severe, swap_low;
+};
 
 //Query the device for updates statuses. 
 memStatus queryDev()
@@ -83,7 +70,7 @@ memStatus queryDev()
 		    	status.severe=true;
 		    memcpy(&swap_pages, &buf[1], sizeof(int));
 		    swap_space = swap_pages * getpagesize();
-		    printf("swap_space: %d\n", swap_space);
+		    //printf("swap_space: %d\n", swap_space);
 		    if(swap_space<250000000){
 			status.swap_low=true;
 			printf("LOW SWAP!!\n");
@@ -106,14 +93,14 @@ static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bus
 	header = getbsize(&hlen, &blocksize);
 		
 
-	(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
+	//(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
 	
-	printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
+	//printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
 	humanize_number(usedbuf, sizeof(usedbuf), CONVERT_BLOCKS(bused), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
 	humanize_number(availbuf, sizeof(availbuf), CONVERT_BLOCKS(bavail), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
-	printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
+	//printf("%8s %8s %5.0f%%\n", usedbuf, availbuf, bpercent);
 }
 
 static void swapmode_sysctl(void)
@@ -153,66 +140,6 @@ static void physmem_sysctl(void)
 //	cout << "Free memory: " << usermem << endl; //change to printf
 }
 
-void monitor_application(int signal_number, siginfo_t *info, void *unused){
-	
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
-	struct managed_application *np_temp = (managed_application*)malloc(sizeof(struct managed_application));
-	struct managed_application *application = (managed_application*)malloc(sizeof(struct managed_application));
-	
-	if (SLIST_FIRST(&head) != NULL){
-		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
-			if (current_application->pid == info->si_pid){
-				SLIST_REMOVE(&head, current_application, managed_application, next_application);
-	
-				kill(current_application->pid, SIGDEREGISTERED);
-				free(current_application);
-				printf("DEREGISTERED\n");
-				return;
-			}
-			if (kill(current_application->pid,0)==-1){
-				SLIST_REMOVE(&head, current_application, managed_application, next_application);
-				free(current_application);
-				printf("TIMED OUT\n");
-			}
-		}
-	}
-	application->pid = info->si_pid;	
-	application->condition = signal_number;
-	SLIST_INSERT_HEAD(&head, application, next_application);
-	kill(application->pid, SIGREGISTERED);
-	printf("REGISTERED\n");
-
-}
-
-void random_millisecond_sleep(int min, int max)
-{
-	struct timespec sleepFor;
-	int randomMilliseconds = ((rand() % max)+min) * 1000 * 1000;
-	sleepFor.tv_sec = 0;
-	sleepFor.tv_nsec = randomMilliseconds;
-	nanosleep(&sleepFor, 0);
-}
-
-void suspend_applications()
-{
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
-	SLIST_FOREACH(current_application, &head, next_application){
-		int pid = current_application->pid;
-		kill(pid, SIGSTOP);
-		printf("SUSPENDED: %d\n", pid);
-	}
-}
-
-void resume_applications()
-{
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
-	SLIST_FOREACH(current_application, &head, next_application){
-		int pid = current_application->pid;
-		kill(pid, SIGCONT);
-		printf("CONTINUED: %d\n", pid);
-		random_millisecond_sleep(0,1000);
-	}
-}
 
 /*
 * Memory Conditions:
@@ -228,39 +155,15 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-//	daemon(0,0);
-	
-	struct sigaction sig;
-	sig.sa_sigaction = monitor_application;
-	sig.sa_flags = SA_SIGINFO;
-	sigaction(SIGSEVERE, &sig, NULL);
-	sigaction(SIGMIN, &sig, NULL);
-	sigaction(SIGPAGESNEEDED, &sig, NULL);
-		
-	SLIST_INIT(&head);
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	init_monitoring();
 	
 	for(;;){
 		swapmode_sysctl();
 		physmem_sysctl();
 		memStatus status = queryDev();
 		if (status.severe || status.min || status.needed){
-			SLIST_FOREACH(current_application, &head, next_application){
-				int pid = current_application->pid;
-				if(status.severe && current_application->condition == SIGSEVERE){
-					kill(pid,SIGTEST);
-					printf("KILLED SEVERE: %d\n", pid);
-				}
-				if(status.min && current_application->condition == SIGMIN){
-					kill(pid,SIGTEST);
-					printf("KILLED MIN: %d\n", pid);
-				}
-				if(status.needed && current_application->condition == SIGPAGESNEEDED){
-					kill(pid,SIGTEST);
-					printf("KILLED PAGES NEEDED: %d\n", pid);
-				}
-				random_millisecond_sleep(0,1000);
-			}
+		
+			check_applications(status.severe, status.min, status.needed);
 			status = queryDev();
 			if (status.severe || status.swap_low){
 				suspend_applications();
