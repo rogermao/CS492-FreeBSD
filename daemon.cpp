@@ -46,39 +46,7 @@ struct memStatus
 	bool target, min, needed, severe, swap_low;
 };
 
-//Query the device for updates statuses. 
-memStatus queryDev()
-{
-	memStatus status = {false,false,false,false,false};
-	// Read the file, C++ libraries are no good for reading from a device
-	int devfile = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
-	if(devfile >= 0){
-		char buf[5+sizeof(int)];
-		int bytesRead=0;
-		int swap_pages=0;
-		int swap_space=0;
-		//If the transfer worked
-		
-		if ((bytesRead = read(devfile,&buf,100))) {
-		    if(buf[0] & 0b1)
-		    	status.target=true;
-		    if(buf[0] & 0b10)
-		    	status.min=true;
-		    if(buf[0] & 0b100)
-		    	status.needed=true;
-		    if(buf[0] & 0b1000)
-		    	status.severe=true;
-		    memcpy(&swap_pages, &buf[1], sizeof(int));
-		    swap_space = swap_pages * getpagesize();
-		    //printf("swap_space: %d\n", swap_space);
-		    if(swap_space<250000000){
-			status.swap_low=true;
-			printf("LOW SWAP!!\n");
-			}
-		}
-	}
-	return status;
-}
+
 
 static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bused, intmax_t bavail, float bpercent)
 {
