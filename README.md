@@ -16,12 +16,12 @@ clang memhog.c -o memhog
 
 sudo ./memhog [daemon pid] [signal #]
 
-4/3
+4/12
 
-clang++ -c -lutil -fPIC daemon.cpp
+pkg install atf
 
-clang++ -shared -lutil -o libDaemon.so daemon.o
+pkg install kyua
 
-clang -o registration_test -I/usr/local/include -L/usr/local/lib registration_test.c -latf-c 
+clang -I/usr/local/include -L/usr/local/lib registration_test.cpp -latf-c++ -o registration_test 
 
 kyua test
