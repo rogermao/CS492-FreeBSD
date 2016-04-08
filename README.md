@@ -24,4 +24,6 @@ pkg install kyua
 
 clang -I/usr/local/include -L/usr/local/lib registration_test.cpp -latf-c++ -o registration_test 
 
+clang -I/usr/local/include -L/usr/local/lib signal_test.cpp -latf-c++ -o signal_test 
+
 kyua test
