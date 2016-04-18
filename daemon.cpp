@@ -31,22 +31,6 @@ using namespace std;
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
 static struct kvm_swap swtot;
 static int nswdev;
-static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
-static struct slisthead *headp;
-
-struct managed_application
-{
-	int pid, condition;
-	SLIST_ENTRY(managed_application) next_application;
-};
-
-//Track all the markers we want to observe
-struct memStatus
-{
-	bool target, min, needed, severe, swap_low;
-};
-
-
 
 static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bused, intmax_t bavail, float bpercent)
 {
