@@ -40,7 +40,7 @@ int flags = 0;
 pthread_t signalThread;
 struct kevent change[1];
 struct kevent event[1];
-struct managed_application *current_application;
+struct managed_application current_application;
 int fd;
 int kq;
 
@@ -122,7 +122,7 @@ void resume_applications()
 	}
 }
 
-void check_queue(int flags){
+void check_queue(){
 		SLIST_FOREACH(current_application, &head, next_application){
 			int pid = current_application->pid;
 			printf("PID %d IS REGISTERED\n", pid);
@@ -141,7 +141,7 @@ void check_queue(int flags){
 		}
 }
 
-void check_flags(int flags){
+void check_flags(){
 		if (flags & 0b1000 || flags & 0b10000){
 			suspend_applications();
 			resume_applications();
