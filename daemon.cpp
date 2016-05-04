@@ -107,15 +107,23 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	init();
-
+	pthread_t signalThread;
+	pthread_create(&signalThread, 0, monitor_signals, (void*)0);
+	int fd=0;
+	fd = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
+	int kq=kqueue();
+	EV_SET(&change[0],fd,EVFILT_READ, EV_ADD,0,0,0);
 	for(;;){
+		printf("BLOCKING\n");
+		int n=kevent(kq,change,1,event,1,NULL);
+		printf("UNBLOCKING\n");
+		int flags = 0;
+		flags = event[0].data;
+		printf("DATA: %d\n", flags);
 
-		setup_flags();
+		check_queue(flags);
 
-		check_queue();
-
-		check_flags();
+		check_flags(flags);
 
 		sleep(2);
 

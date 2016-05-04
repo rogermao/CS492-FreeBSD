@@ -37,12 +37,8 @@ struct memStatus
 
 static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
 static struct slisthead *headp;
-int flags = 0;
-pthread_t signalThread;
 struct kevent change[1];
 struct kevent event[1];
-int fd;
-int kq;
 
 using namespace std;
 
@@ -122,7 +118,7 @@ void resume_applications()
 	}
 }
 
-void check_queue(){
+void check_queue(int flags){
 		struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
 		SLIST_FOREACH(current_application, &head, next_application){
 			int pid = current_application->pid;
@@ -142,7 +138,7 @@ void check_queue(){
 		}
 }
 
-void check_flags(){
+void check_flags(int flags){
 		if (flags & 0b1000 || flags & 0b10000){
 			suspend_applications();
 			resume_applications();
@@ -160,27 +156,6 @@ void *monitor_signals(void* unusedParam)
 	sigaction(SIGPAGESNEEDED, &sig, NULL);
 	for (;;)
 		pause();
-}
-
-void init()
-{
-	SLIST_INIT(&head);
-
-	pthread_create(&signalThread, 0, monitor_signals, (void*)0);
-	fd=0;
-	fd = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
-	kq=kqueue();
-	EV_SET(&change[0],fd,EVFILT_READ, EV_ADD,0,0,0);
-
-}
-
-void setup_flags(){
-		printf("BLOCKING\n");
-		int n=kevent(kq,change,1,event,1,NULL);
-		printf("UNBLOCKING\n");
-		flags = 0;
-		flags = event[0].data;
-		printf("DATA: %d\n", flags);
 }
 
 void sleepFor(int seconds){
