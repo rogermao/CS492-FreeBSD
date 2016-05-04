@@ -23,11 +23,6 @@
 #define SIGREGISTERED 48
 #define SIGDEREGISTERED 49
 
-static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
-static struct slisthead *headp;
-int flags = 0;
-pthread_t signalThread;
-
 struct managed_application
 {
 	int pid, condition;
@@ -38,6 +33,16 @@ struct memStatus
 {
 	bool target, min, needed, severe, swap_low;
 };
+
+static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
+static struct slisthead *headp;
+int flags = 0;
+pthread_t signalThread;
+struct kevent change[1];
+struct kevent event[1];
+struct managed_application *current_application;
+int fd;
+int kq;
 
 using namespace std;
 
@@ -84,6 +89,16 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 	SLIST_INSERT_HEAD(&head, application, next_application);
 	printf("REGISTERED\n");
 
+}
+
+
+void random_millisecond_sleep(int min, int max)
+{
+	struct timespec sleepFor;
+	int randomMilliseconds = ((rand() % max)+min) * 1000 * 1000;
+	sleepFor.tv_sec = 0;
+	sleepFor.tv_nsec = randomMilliseconds;
+	nanosleep(&sleepFor, 0);
 }
 
 void suspend_applications()
@@ -133,7 +148,7 @@ void check_flags(int flags){
 		}
 }
 
-void init_monitoring()
+void *monitor_signals(void* unusedParam)
 {
 	struct sigaction sig;
 	sig.sa_sigaction = monitor_application;
@@ -148,13 +163,14 @@ void init_monitoring()
 void init()
 {
 	SLIST_INIT(&head);
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+	*current_application = (managed_application*)malloc(sizeof(struct managed_application));
 
 	pthread_create(&signalThread, 0, monitor_signals, (void*)0);
-	int fd=0;
+	fd=0;
 	fd = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
-	int kq=kqueue();
+	kq=kqueue();
 	EV_SET(&change[0],fd,EVFILT_READ, EV_ADD,0,0,0);
+
 }
 
 void setup_flags(){
