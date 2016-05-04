@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <fstream>
+#include <pthread.h>
 
 #include <sys/event.h>
 #include <sys/sysctl.h>
