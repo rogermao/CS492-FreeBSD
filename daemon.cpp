@@ -116,12 +116,7 @@ int main(int argc, char ** argv)
 	int kq=kqueue();
 	EV_SET(&change[0],fd,EVFILT_READ, EV_ADD,0,0,0);
 	for(;;){
-		printf("BLOCKING\n");
-		int n=kevent(kq,change,1,event,1,NULL);
-		printf("UNBLOCKING\n");
-		int flags = 0;
-		flags = event[0].data;
-		printf("DATA: %d\n", flags);
+		int flags = block(kq, change, event)
 
 		check_queue(flags);
 

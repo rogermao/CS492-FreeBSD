@@ -143,6 +143,16 @@ void check_flags(int flags){
 		}
 }
 
+int block(int kq, struct kevent change, struct kevent event){
+		printf("BLOCKING\n");
+		int n=kevent(kq,change,1,event,1,NULL);
+		printf("UNBLOCKING\n");
+		int flags = 0;
+		flags = event[0].data;
+		printf("DATA: %d\n", flags);
+		return flags;
+}
+
 //Block waiting for registration or deregistration signals. This runs on a thread seperate from the main thread as the main thread will be blocking on the char device
 void *monitor_signals(void* unusedParam)
 {
