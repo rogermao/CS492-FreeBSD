@@ -40,7 +40,6 @@ int flags = 0;
 pthread_t signalThread;
 struct kevent change[1];
 struct kevent event[1];
-struct managed_application current_application;
 int fd;
 int kq;
 
@@ -123,6 +122,7 @@ void resume_applications()
 }
 
 void check_queue(){
+		struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
 		SLIST_FOREACH(current_application, &head, next_application){
 			int pid = current_application->pid;
 			printf("PID %d IS REGISTERED\n", pid);
@@ -163,7 +163,6 @@ void *monitor_signals(void* unusedParam)
 void init()
 {
 	SLIST_INIT(&head);
-	*current_application = (managed_application*)malloc(sizeof(struct managed_application));
 
 	pthread_create(&signalThread, 0, monitor_signals, (void*)0);
 	fd=0;
