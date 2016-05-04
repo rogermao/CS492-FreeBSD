@@ -31,6 +31,8 @@ using namespace std;
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
 static struct kvm_swap swtot;
 static int nswdev;
+struct kevent change[1];
+struct kevent event[1];
 
 static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bused, intmax_t bavail, float bpercent)
 {
