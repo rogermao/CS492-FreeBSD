@@ -19,12 +19,14 @@
 
 #define SIGSEVERE 45
 #define SIGMIN 46
-#define SIGPAGESNEEDED 47 
-#define SIGREGISTERED 48 
-#define SIGDEREGISTERED 49 
+#define SIGPAGESNEEDED 47
+#define SIGREGISTERED 48
+#define SIGDEREGISTERED 49
 
 static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
 static struct slisthead *headp;
+int flags = 0;
+pthread_t signalThread;
 
 struct managed_application
 {
@@ -37,7 +39,7 @@ struct memStatus
 	bool target, min, needed, severe, swap_low;
 };
 
-using namespace std; 
+using namespace std;
 
 int isRegistered(int pid){
 
@@ -46,35 +48,26 @@ int isRegistered(int pid){
 	if (SLIST_FIRST(&head) != NULL){
 		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
 			if (current_application->pid == pid){
-				std::cout << "in queue" << endl;	
-				return true;				
+				std::cout << "in queue" << endl;
+				return true;
 			}
 		}
 	}
 	std::cout << "not in queue " << endl;
-	return false;	
-}
+	return false;
 
-void random_millisecond_sleep(int min, int max)
-{
-	struct timespec sleepFor;
-	int randomMilliseconds = ((rand() % max)+min) * 1000 * 1000;
-	sleepFor.tv_sec = 0;
-	sleepFor.tv_nsec = randomMilliseconds;
-	nanosleep(&sleepFor, 0);
 }
 
 void monitor_application(int signal_number, siginfo_t *info, void *unused){
-	
+
 	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
 	struct managed_application *np_temp = (managed_application*)malloc(sizeof(struct managed_application));
 	struct managed_application *application = (managed_application*)malloc(sizeof(struct managed_application));
-	
+
 	if (SLIST_FIRST(&head) != NULL){
 		SLIST_FOREACH_SAFE(current_application, &head, next_application, np_temp){
 			if (current_application->pid == info->si_pid){
 				SLIST_REMOVE(&head, current_application, managed_application, next_application);
-	
 				free(current_application);
 				printf("DEREGISTERED\n");
 				return;
@@ -86,7 +79,7 @@ void monitor_application(int signal_number, siginfo_t *info, void *unused){
 			}
 		}
 	}
-	application->pid = info->si_pid;	
+	application->pid = info->si_pid;
 	application->condition = signal_number;
 	SLIST_INSERT_HEAD(&head, application, next_application);
 	printf("REGISTERED\n");
@@ -114,61 +107,30 @@ void resume_applications()
 	}
 }
 
-//Query the device for updates statuses. 
-memStatus queryDev()
-{
-	memStatus status = {false,false,false,false,false};
-	// Read the file, C++ libraries are no good for reading from a device
-	int devfile = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
-	if(devfile >= 0){
-		char buf[5+sizeof(int)];
-		int bytesRead=0;
-		int swap_pages=0;
-		int swap_space=0;
-		//If the transfer worked
-		
-		if ((bytesRead = read(devfile,&buf,100))) {
-		    if(buf[0] & 0b1)
-		    	status.target=true;
-		    if(buf[0] & 0b10)
-		    	status.min=true;
-		    if(buf[0] & 0b100)
-		    	status.needed=true;
-		    if(buf[0] & 0b1000)
-		    	status.severe=true;
-		    memcpy(&swap_pages, &buf[1], sizeof(int));
-		    swap_space = swap_pages * getpagesize();
-		    //printf("swap_space: %d\n", swap_space);
-		    if(swap_space<250000000){
-			status.swap_low=true;
-			printf("LOW SWAP!!\n");
+void check_queue(int flags){
+		SLIST_FOREACH(current_application, &head, next_application){
+			int pid = current_application->pid;
+			printf("PID %d IS REGISTERED\n", pid);
+			if(flags & 0b1000 && current_application->condition == SIGSEVERE){
+				kill(pid,SIGTEST);
+				printf("KILLED SEVERE: %d\n", pid);					}
+			if(flags & 0b10 && current_application->condition == SIGMIN){
+				kill(pid,SIGTEST);
+				printf("KILLED MIN: %d\n", pid);
 			}
+			if(flags & 0b100 && current_application->condition == SIGPAGESNEEDED){
+				kill(pid,SIGTEST);
+				printf("KILLED PAGES NEEDED: %d\n", pid);
+			}
+			random_millisecond_sleep(0,1000);
 		}
-	}
-	return status;
 }
 
-void check_applications(bool severe, bool min, bool needed){
-	
-	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
-
-	SLIST_FOREACH(current_application, &head, next_application){
-		int pid = current_application->pid;
-		if(severe && current_application->condition == SIGSEVERE){
-			kill(pid,SIGTEST);
-			printf("KILLED SEVERE: %d\n", pid);
+void check_flags(int flags){
+		if (flags & 0b1000 || flags & 0b10000){
+			suspend_applications();
+			resume_applications();
 		}
-		if(min && current_application->condition == SIGMIN){
-			kill(pid,SIGTEST);
-			printf("KILLED MIN: %d\n", pid);
-		}
-		if(needed && current_application->condition == SIGPAGESNEEDED){
-			kill(pid,SIGTEST);
-			printf("KILLED PAGES NEEDED: %d\n", pid);
-		}
-		random_millisecond_sleep(0,1000);
-	}
-	
 }
 
 void init_monitoring()
@@ -181,4 +143,32 @@ void init_monitoring()
 	sigaction(SIGPAGESNEEDED, &sig, NULL);
 
 	SLIST_INIT(&head);
+}
+
+void init()
+{
+	SLIST_INIT(&head);
+	struct managed_application *current_application = (managed_application*)malloc(sizeof(struct managed_application));
+
+	pthread_create(&signalThread, 0, monitor_signals, (void*)0);
+	int fd=0;
+	fd = open("/dev/lowmem", O_RDWR | O_NONBLOCK);
+	int kq=kqueue();
+	EV_SET(&change[0],fd,EVFILT_READ, EV_ADD,0,0,0);
+}
+
+void setup_flags(){
+		printf("BLOCKING\n");
+		int n=kevent(kq,change,1,event,1,NULL);
+		printf("UNBLOCKING\n");
+		flags = 0;
+		flags = event[0].data;
+		printf("DATA: %d\n", flags);
+}
+
+void sleepFor(int seconds){
+		struct timespec sleepFor;
+		sleepFor.tv_sec = seconds;
+		sleepFor.tv_nsec = 0;
+		nanosleep(&sleepFor, 0);
 }

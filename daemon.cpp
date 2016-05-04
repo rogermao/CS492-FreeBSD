@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <vm/vm_param.h>
-using namespace std; 
+using namespace std;
 
 //These signals will eventually come from a .h file
 //44 is a test number, the number used in deployment will require review by an architect
@@ -23,9 +23,9 @@ using namespace std;
 
 #define SIGSEVERE 45
 #define SIGMIN 46
-#define SIGPAGESNEEDED 47 
-#define SIGREGISTERED 48 
-#define SIGDEREGISTERED 49 
+#define SIGPAGESNEEDED 47
+#define SIGREGISTERED 48
+#define SIGDEREGISTERED 49
 
 #define CONVERT(v)	((int64_t)(v) * pagesize / blocksize)
 #define CONVERT_BLOCKS(v) 	((int64_t)(v) * pagesize)
@@ -38,15 +38,15 @@ static void print_swap_stats(const char *swdevname, intmax_t nblks, intmax_t bus
 	char availbuf[5];
 	int hlen, pagesize;
 	long blocksize;
-	const char *header;	
+	const char *header;
 
 	pagesize = getpagesize();
 	getbsize(&hlen, &blocksize);
 	header = getbsize(&hlen, &blocksize);
-		
+
 
 	//(void)printf("%-15s %*s %8s %8s %8s\n", "Device", hlen, header, "Used", "Avail", "Capacity");
-	
+
 	//printf("%-15s %*jd ", swdevname, hlen, CONVERT(nblks));
 	humanize_number(usedbuf, sizeof(usedbuf), CONVERT_BLOCKS(bused), "",
 			HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
@@ -74,11 +74,11 @@ static void swapmode_sysctl(void)
 		kswap.ksw_total = xsw.xsw_nblks;
 		swtot.ksw_total += kswap.ksw_total;
 		swtot.ksw_used += kswap.ksw_used;
-		++nswdev;	
+		++nswdev;
 	}
 	print_swap_stats("Swap Total", swtot.ksw_total, swtot.ksw_used,
 			swtot.ksw_total - swtot.ksw_used,
-			(swtot.ksw_used * 100.0) / swtot.ksw_total);	
+			(swtot.ksw_used * 100.0) / swtot.ksw_total);
 }
 
 static void physmem_sysctl(void)
@@ -107,23 +107,18 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	init_monitoring();
-	
+	init();
+
 	for(;;){
-		swapmode_sysctl();
-		physmem_sysctl();
-		memStatus status = queryDev();
-		if (status.severe || status.min || status.needed){
-		
-			check_applications(status.severe, status.min, status.needed);
-			status = queryDev();
-			if (status.severe || status.swap_low){
-				suspend_applications();
-				resume_applications();
-			}
-			
-		}
+
+		setup_flags();
+
+		check_queue();
+
+		check_flags();
+
 		sleep(2);
+
 	}
 	return 0;
 }
