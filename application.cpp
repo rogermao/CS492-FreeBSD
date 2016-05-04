@@ -148,6 +148,7 @@ void check_flags(){
 		}
 }
 
+//Block waiting for registration or deregistration signals. This runs on a thread seperate from the main thread as the main thread will be blocking on the char device
 void *monitor_signals(void* unusedParam)
 {
 	struct sigaction sig;
@@ -156,8 +157,8 @@ void *monitor_signals(void* unusedParam)
 	sigaction(SIGSEVERE, &sig, NULL);
 	sigaction(SIGMIN, &sig, NULL);
 	sigaction(SIGPAGESNEEDED, &sig, NULL);
-
-	SLIST_INIT(&head);
+	for (;;)
+		pause();
 }
 
 void init()
