@@ -37,8 +37,6 @@ struct memStatus
 
 static SLIST_HEAD(slisthead, managed_application) head = SLIST_HEAD_INITIALIZER(head);
 static struct slisthead *headp;
-struct kevent change[1];
-struct kevent event[1];
 
 using namespace std;
 
